@@ -1,0 +1,1342 @@
+<!DOCTYPE html>
+<html>
+
+<script type="text/javascript" src="initFile.js"></script>
+<script type="text/javascript" src="matrix solver.js"></script>
+<style>
+a {
+    text-decoration: none;
+    font-size: 35px;
+    display: inline-block;
+    padding: 1px 10px;
+    text-align: center;
+    vertical-align: middle;
+    background-color: black;
+	color: white;  
+}
+
+a:hover {
+    background-color: lightblue;
+    color: black;
+}
+
+.unselectable {
+  -webkit-user-select: none; 
+  -moz-user-select: none;    
+}
+
+
+</style>
+
+<body>
+
+
+<div id="choose" class="unselectable"  style="position:absolute;">
+	<input type="file" id="files" style="width: 90px" accept="audio/*" onclick = "hi();"/>
+</div>
+
+<div id="instructDiv" class="unselectable"  style="position:absolute;">
+	zoom-in/out: click-hold and move cursor up/down.    scroll left/right: click-hold and move cursor left/right. <br>
+	set start point: left-click on a zero point.    set end point: right-click on a zero point. 
+</div>
+
+<div id="canvasDiv" class="unselectable" style="position:absolute;">
+	<canvas id="canvas" width="200" height="100" style="border:3px solid black; position: absolute; left: 0; top: 0; z-index: 0;"></canvas>
+	<canvas id="canvasT" oncontextmenu="return false;" width="200" height="100" style="border:3px solid black; position: absolute; left: 0; top: 0; z-index: 1;"></canvas>	
+</div>
+
+
+
+
+
+<div id="speed1Div" class="unselectable" style="position:absolute;">
+  <input id="speed1"  type="range" min="1" max="73" value="36"	oninput= 'setPlaySpeed(1);'></input> freq
+</div>
+
+<div id="vol1Div" class="unselectable" style="position:absolute;">
+  <input id="vol1"  type="range" min="0" max="100" value="50"
+	oninput = 'setGain(1);' style="width: 20px; -webkit-appearance: slider-vertical;"> </input> vol
+</div>
+
+<div id="play1Div" class="unselectable" style="position:absolute; text-align:center; text-vertical-align:middle;"> 
+  <a id="play1" onclick="playPause(1);" style="text-align:center; text-vertical-align:middle;">&#9658&#10074&#10074</a>
+</div>
+
+<div id="opts1Div" class="unselectable" style="position:absolute; text-vertical-align:middle;"> 
+	table length <select name="tabLen" id="tabLen" oninput = "tableChange();"> </select> samples <br/>
+	table resolution <select name="tabRes" id="tabRes" oninput = "tableChange();"> </select> bit <br/>
+	sign bit <select name="tabSign" id="tabSign" oninput = "tableChange();"> </select>
+</div>
+
+<div id="opts2Div" class="unselectable" style="position:absolute; text-vertical-align:middle;"> 
+	interpolation: use <select name="smoothOrd" id="smoothOrd" oninput = "tableChange();"> </select> points on either side  <br/>
+	smooth last <select name="smoothAmt" id="smoothAmt" oninput = "tableChange();"> </select> points <br/>
+	normalize <input id="norm" type="checkbox" checked="true" onchange = "tableChange();"> </input> <br/>
+</div>
+
+
+<div id="canvas2Div" class="unselectable" style="position:absolute;">
+	<canvas id="canvas2"  width="200" height="100" style="border:3px solid black; position: absolute; left: 0; top: 0; z-index: 0;"></canvas>
+</div>
+
+<div id="speed2Div" class="unselectable" style="position:absolute;">
+  <input id="speed2"  type="range" min="1" max="73" value="36"	oninput= 'setPlaySpeed(2);'></input> freq
+</div>
+
+<div id="vol2Div" class="unselectable" style="position:absolute;">
+  <input id="vol2"  type="range" min="0" max="100" value="50"
+	oninput = 'setGain(2);' style="width: 20px; -webkit-appearance: slider-vertical;"> </input> vol
+</div>
+
+<div id="play2Div" class="unselectable" style="position:absolute; text-align:center; text-vertical-align:middle;"> 
+  <a id="play2" onclick="playPause(2);" style="text-align:center; text-vertical-align:middle;">&#9658&#10074&#10074</a>
+</div>
+
+<div id="opts3Div" class="unselectable" style="position:absolute; text-vertical-align:middle;"> 
+	save as <input type="text" id="fName"> </input> <button type="button" id="download" onclick="download();"> download </button><br><br>
+	<button type="button" id="synths" onclick="downloadSynths(true);"> download basic wave: </button>	
+	<input type="radio" id="sine" name="curveInd" onclick="downloadSynths(false);" checked> sine
+	<input type="radio" id="squF" name="curveInd" onchange="downloadSynths(false);" > square(full)
+	<input type="radio" id="squR" name="curveInd" onchange="downloadSynths(false);" > square(RMS)
+	<input type="radio" id="tri" name="curveInd" onchange="downloadSynths(false);" > triangle
+	<input type="radio" id="sawU" name="curveInd" onchange="downloadSynths(false);"  > saw Up
+	<input type="radio" id="sawD" name="curveInd" onchange="downloadSynths(false);" > saw Down 
+	<input type="radio" id="noise" name="curveInd" onchange="downloadSynths(false);" > noise <br>
+	<input id="duty"  type="range" min="1" max="100" onchange="downloadSynths(false);" value="50"></input> duty cycle
+	<a id='dummy' style="visibility: hidden"</a>
+</div>
+
+</body>
+
+<script>
+
+
+
+const zoomScl = .97;
+const pointRad = 6;
+const sPointRad = 1;
+const tPointRad = 10;
+const width = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
+const height = window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight;
+const logLow = Math.log(.125);
+const logHigh = Math.log(8);
+var logLow2;
+var logHigh2;
+const halfHt = height * .17;
+
+var dragging = false;
+var playing = 0;
+
+var playSpeed = 1;
+var clickXY = [0,0];
+var fullArray = initArr;
+var tableArray;
+var zeros = [];
+var oldTabRes = 2;
+var oldTabLen = 1;
+var winLow = 0;
+var winHigh;
+var lowLock = -1;
+var highLock = -1;
+var exactCent;
+var nearestZero=-1;
+var atZeroY=false;
+var started = false;
+
+
+
+var audioContext; 
+var player; 
+var masterGainNode;
+var gainNode;
+
+
+var choose = document.getElementById("choose");
+choose.style.left = width * 0.1;
+choose.style.top = height * 0.2;
+document.getElementById('files').addEventListener('change', getWavArray, false);
+
+var canvasDiv = document.getElementById("canvasDiv");
+canvasDiv.style.left = choose.style.left;
+canvasDiv.style.top = document.getElementById("instructDiv").offsetTop + document.getElementById("instructDiv").clientHeight + 10 + 'px';
+
+document.getElementById("instructDiv").style.left = width * .4 +'px';
+
+var canvas = document.getElementById("canvas")
+canvas.width = width * 0.85;
+canvas.height = halfHt * 2;
+var cx = canvas.getContext("2d");
+canvasLeft = canvasDiv.offsetLeft + Number(canvas.style.borderWidth.substring(0,canvas.style.borderWidth.length-2));
+canvasTop = canvasDiv.offsetTop + Number(canvas.style.borderWidth.substring(0,canvas.style.borderWidth.length-2));
+
+
+//document.getElementById("canvasTDiv").style.left = canvasDiv.style.left;
+//document.getElementById("canvasTDiv").style.top = canvasDiv.style.top;
+
+var canvasT = document.getElementById("canvasT")
+canvasT.width = canvas.width;
+canvasT.height = canvas.height;
+var cxT = canvasT.getContext("2d");
+canvasT.addEventListener("mousedown", enterDrag);
+document.addEventListener("mouseup", leaveDrag);
+document.addEventListener("mousemove", zoomScroll);
+
+document.getElementById("vol1Div").style.left = canvasLeft + canvas.clientWidth + 10 + 'px';
+document.getElementById("vol1Div").style.top = canvasTop + 'px';
+var vol1 = document.getElementById("vol1");
+vol1.style.height = canvas.height + 'px';
+
+document.getElementById("play1Div").style.left = document.getElementById("vol1Div").offsetLeft + vol1.clientWidth + 15 + 'px';
+document.getElementById("play1Div").style.top = canvasTop + canvas.clientHeight * .3 + 'px';
+var play1 = document.getElementById("play1");
+play1.style.padding= "30px 10px 30px 10px";
+
+document.getElementById("speed1Div").style.left = canvasLeft + 'px';
+document.getElementById("speed1Div").style.top = canvasTop + canvas.clientHeight + 10 + 'px';
+var speed1 = document.getElementById("speed1");
+speed1.style.width = canvas.clientWidth + 'px';
+
+
+
+document.getElementById("opts1Div").style.left = canvasLeft + 'px';
+document.getElementById("opts1Div").style.top = document.getElementById("speed1Div").offsetTop + 50 + 'px';
+
+var tabLen = document.getElementById("tabLen");
+var tabSign = document.getElementById("tabSign");
+var tabRes = document.getElementById("tabRes");
+
+tabLen.options.length = 0;
+for(var i = 3; i < 15; i +=1)
+{
+	var opt = document.createElement('option');
+    opt.value = Math.pow(2,i);
+    opt.innerHTML = opt.value;
+    tabLen.appendChild(opt);
+}
+tabLen.value = 512;
+
+tabRes.options.length = 0;
+for(var i = 3; i < 6; i +=1)
+{
+	var opt = document.createElement('option');
+    opt.value = Math.pow(2,i);
+    opt.innerHTML = opt.value;
+    tabRes.appendChild(opt);
+}
+tabRes.value = 32;
+
+document.getElementById("opts2Div").style.left = document.getElementById("opts1Div").offsetLeft + 250 + 'px';
+document.getElementById("opts2Div").style.top = document.getElementById("opts1Div").style.top;
+
+var smoothAmt = document.getElementById("smoothAmt");
+var smoothOrd = document.getElementById("smoothOrd");
+
+
+
+smoothOrd.options.length = 0;
+for(var i = 1; i < 10; i +=1)
+{
+	var opt = document.createElement('option');
+    opt.value = i;
+    opt.innerHTML = opt.value;
+    smoothOrd.appendChild(opt);
+}
+smoothOrd.value = 3;
+
+tableChange();
+
+document.getElementById("canvas2Div").style.left = document.getElementById("canvasDiv").style.left;
+document.getElementById("canvas2Div").style.top = document.getElementById("opts2Div").offsetTop + 80 + 'px';
+var canvas2 = document.getElementById("canvas2")
+canvas2.width = canvas.width *.8;
+canvas2.height = canvas.height * .7;
+var cx2 = canvas2.getContext("2d");
+
+
+document.getElementById("vol2Div").style.left = canvasLeft + canvas2.clientWidth + 10 + 'px';
+document.getElementById("vol2Div").style.top = document.getElementById("canvas2Div").style.top;
+var vol2 = document.getElementById("vol2");
+vol2.style.height = canvas2.height + 'px';
+
+document.getElementById("play2Div").style.left = document.getElementById("vol2Div").offsetLeft + vol2.clientWidth +15 + 'px';
+document.getElementById("play2Div").style.top = document.getElementById("canvas2Div").offsetTop + canvas2.clientHeight * .2 + 'px';
+var play2 = document.getElementById("play2");
+play2.style.padding= "30px 10px 30px 10px";
+
+document.getElementById("speed2Div").style.left = canvasLeft + 'px';
+document.getElementById("speed2Div").style.top = document.getElementById("canvas2Div").offsetTop + canvas2.clientHeight + 10 + 'px';
+var speed2 = document.getElementById("speed2");
+speed2.style.width = canvas2.clientWidth + 'px';
+
+document.getElementById("opts3Div").style.left = document.getElementById("canvasDiv").style.left;
+document.getElementById("opts3Div").style.top = document.getElementById("speed2Div").offsetTop + 40 + 'px';
+
+
+var duty = document.getElementById("duty");
+duty.style.width = canvas2.clientWidth + 'px';
+
+function hi()
+{
+	audioContext = new AudioContext();
+	masterGainNode = audioContext.createGain();
+	gainNode = audioContext.createGain();
+	masterGainNode.connect(audioContext.destination);
+	gainNode.connect(masterGainNode);
+	started = true;
+	console.log("hi");
+}
+
+
+function linInterpSpec(x0, y0, y1)
+{
+	return y0/(y0-y1) + x0;
+}
+
+function linInterp(xLow, xCur, xHigh, yLow, yHigh)
+{
+	return (xCur-xLow)/(xHigh-xLow)*(yHigh-yLow) + yLow;
+}
+
+
+function setGain(windowInd)
+{
+	if(windowInd === 1 && playing === 1)
+		gainNode.gain.setTargetAtTime(vol1.value/vol1.max, 0, 0);
+	else if(windowInd === 2 && playing === 2)
+		gainNode.gain.setTargetAtTime(vol2.value/vol2.max, 0, 0);
+		
+}
+
+function setPlaySpeed(windowInd)
+{
+	if(windowInd === 1)
+		playSpeed = Math.exp(linInterp(speed1.min, speed1.value, speed1.max,logLow, logHigh));
+	else if(windowInd === 2)
+		playSpeed = Math.exp(linInterp(speed2.min, speed2.value, speed2.max,logLow2, logHigh2));
+	
+	if(playing > 0)
+		player.playbackRate.setTargetAtTime(playSpeed, 0, 0);
+		
+		console.log(playSpeed + ', ' + speed1.value);
+	
+	
+}
+
+function getWavArray(evt) 
+{
+	var reader = new FileReader();
+	reader.onload = function()
+	{
+		audioContext.decodeAudioData(reader.result, decodedDone);
+	};
+
+	if(evt.target.files.length === 0)
+		return;
+		
+	var max = (evt.target.files[0].type === 'audio/wav')? 2000000: 250000;
+	cx.clearRect(0, 0, canvas.width, canvas.height);
+	fullArray = [];
+	if(Number(evt.target.files[0].size) > max)
+	{
+		cx.fillStyle = 'RGB(0,0,0)';
+		cx.lineWidth = .5;
+		cx.font="20px Arial";
+		cx.fillText("files this long are very slow to load and tend to crash the browser.", 5, halfHt);
+		cx.fillText("please use audacity or some other program to save a 10 sec or smaller portion of this file.", 5, halfHt + 30);
+		return;
+	}
+	
+	if(playing > 0)
+		playPause(0);
+		
+	reader.readAsArrayBuffer(evt.target.files[0]);
+};
+
+function decodedDone(decoded) {
+
+	
+	fullArray = new Float32Array(decoded.length);
+	fullArray=decoded.getChannelData(0);
+	findZeros();
+}
+
+findZeros();
+function findZeros()
+{	
+	zeros = [];
+	var signB = Math.sign(fullArray[0]);
+	var signA;
+	for(i = 1; i < fullArray.length; i += 1)
+	{
+		signA = signB;
+		signB = Math.sign(fullArray[i]);
+		if (Math.abs(signA) === 0)
+			zeros.push(i-1);
+		else if (Math.abs(signB) !== 0 && Math.sign(fullArray[i-1]) !== Math.sign(fullArray[i]))
+			zeros.push(linInterpSpec(i-1,fullArray[i-1],fullArray[i]));
+	}
+	winLow = 0;
+	winHigh = fullArray.length-1;
+	lowLock = -1;
+	highLock = -1;
+	document.getElementById('dummy').href = null;
+	reDraw();
+	console.log('wind width: ' + (winHigh-winLow));
+	//outputArrStr();
+	
+
+}
+
+function outputArrStr()
+{
+	var str = "var initArr = [\n\t";
+	var cnt = 0;
+	for(var i = 0; i < fullArray.length; i+= 1)
+	{
+		str += fullArray[i] + ',';
+		cnt +=1; 
+		if(cnt == 7)
+		{		
+			str += '\n\t';
+			cnt = 0;
+		}
+	}
+	str += '\n];';
+	
+	var data = new Blob([str], {type: 'text/plain'});
+	var dummy = document.getElementById('dummy');
+	dummy.href = URL.createObjectURL(data);
+	dummy.download ="initArray";
+	dummy.click();
+}
+		
+	
+	
+
+
+function tableChange()
+{
+	
+	if(oldTabRes !== tabRes.value)
+	{	
+		tabSign.options.length = 0;
+		for(var i = 1; i<= tabRes.value; i += 1)
+		{
+			var opt = document.createElement('option');
+			opt.value = i;
+			opt.innerHTML = i;
+			tabSign.appendChild(opt);
+		}
+		//console.log(tabRes.value);
+		switch(Number(tabRes.value))
+		{
+			case 32:
+				//console.log('im 32');
+				tabSign.value = 32;
+				break;
+			case 16:
+				tabSign.value = 16;
+				break;
+			case 8:
+				tabSign.value = 8;
+		}
+		oldTabRes = tabRes.value;
+	}
+	
+	
+	if(oldTabLen !== tabLen.value)
+	{
+		console.log(oldTabLen + ', new -- cur ' + tabLen.value);
+		smoothAmt.options.length = 0;
+		
+		var inc = Math.max(1,Math.floor(tabLen.value/100));
+		var ind = 0;
+		for(var i = 0; ind < tabLen.value; i +=1)
+		{
+			var opt = document.createElement('option');
+			opt.value = ind;
+			opt.innerHTML = opt.value;
+			smoothAmt.appendChild(opt);
+			ind += inc;
+		}
+		
+		smoothAmt.value = 0;
+		oldTabLen = tabLen.value;
+		logLow2 = Math.log(.125 * tabLen.value/256);
+		logHigh2 = Math.log(8 * tabLen.value/256);
+	}
+	
+	
+	
+	//recalc/redraw table
+	reSample();
+	
+	if(playing === 2) playPause(2, 1);
+
+	
+			
+}
+
+ 
+function enterDrag(event)
+{
+	if(typeof(fullArray) === 'undefined' || fullArray.length === 0)
+	{
+		dragging = false;
+		return;
+	}
+	
+	//console.log(event.buttons ===1);
+	if(nearestZero !== -1)
+	{
+		var newLocks = false;
+		if(event.ctrlKey || (!event.altKey && event.buttons === 1 && atZeroY ))
+		{
+			lowLock = nearestZero;
+			if(highLock !== -1 && highLock <= lowLock)
+				highLock = -1;
+			reDraw();
+			newLocks = true;
+		}
+		else if(event.altKey || (event.buttons === 2 && atZeroY))
+		{
+			highLock = nearestZero;
+			if(lowLock !== -1 && lowLock >= highLock)
+				lowLock = -1
+			reDraw();
+			newLocks = true;
+		}
+		if(newLocks)
+		{
+			reDraw();
+			reSample();
+			if(playing > 0)
+			{
+				var tFlag = playing;
+				playPause(tFlag, 1);
+			}
+		}
+	}
+	clickXY[0] = event.clientX;
+	clickXY[1] = event.clientY;
+	dragging = true;
+
+}
+
+function leaveDrag(event)
+{
+	dragging = false;
+	if(typeof(fullArray) === 'undefined' || fullArray.length === 0)
+	{
+		return;
+	}
+	getClosest(event);
+}
+
+
+function getClosest(event)
+{
+	
+	exactCent = (event.clientX-canvasLeft)/canvas.clientWidth * (winHigh-winLow) + winLow;
+	var upr = zeros.length-1;
+	var lwr = 0;
+	var mid;
+	var itr = 0;
+
+	while(Math.abs(upr-lwr) > 1 && itr < 50)
+	{
+		itr+=1;
+		mid = Math.round((upr -lwr)/2)+lwr;
+		if(exactCent > zeros[mid])
+			lwr = mid;
+		else if(exactCent < zeros[mid])
+			upr = mid;
+		else
+			break;
+	}
+	
+	var diff = Math.abs(exactCent-zeros[mid]);
+	var lwr = mid;
+	for(var i = -4; i < 5; i += 1)
+	{
+		var newDiff = Math.abs(zeros[lwr + i]-exactCent);
+		if( newDiff < diff)
+		{
+			mid = lwr +i;
+			diff = newDiff;
+		}
+	}
+	var tType = 4;
+	var tCent = exactCent;
+	atZeroY = false;
+	if(diff/(winHigh-winLow) * canvas.clientWidth < (tPointRad * 1.5))
+	{
+		nearestZero = mid;
+		tCent = zeros[nearestZero];
+		
+		if(Math.abs(event.clientY - canvasTop - halfHt) < (tPointRad * 1.5))
+			atZeroY = true;
+		
+		if(event.ctrlKey || nearestZero === lowLock)
+			tType = 0;
+		else if(event.altKey || nearestZero === highLock)
+			tType = 1;	
+		else if(atZeroY)
+			tType = 3;
+		else	
+			tType = 2;
+	}
+	else
+	{
+		nearestZero = -1;
+	}
+	
+	cxT.clearRect(0,0,canvas.width, canvas.height);
+	if(event.clientY - canvasTop >= 0 && event.clientY - canvasTop <= canvas.height)
+	{
+		cxT.beginPath();
+		cxT.strokeStyle = 'RGB(200,200,255)';
+		cxT.lineWidth = 1;
+		cxT.moveTo((tCent-winLow)/(winHigh-winLow) * canvas.clientWidth,0);
+		cxT.lineTo((tCent-winLow)/(winHigh-winLow) * canvas.clientWidth,canvas.height);
+		cxT.stroke();
+		cxT.closePath();
+		
+		cxT.beginPath();
+		if(tType < 4)
+		{
+			if(tType === 0)
+				cxT.fillStyle = 'RGB(0,170,0)';
+			else if(tType === 1)
+				cxT.fillStyle = 'RGB(255,100,100)';
+			else if(tType === 3)
+				cxT.fillStyle = 'RGB(255,0,255)';
+			else
+				cxT.fillStyle = 'RGB(255,165,0)';
+
+			cxT.arc((tCent-winLow)/(winHigh-winLow) * canvas.clientWidth, halfHt, tPointRad,0, 6.3);
+			cxT.fill();
+			cxT.closePath();
+		}
+	}
+	
+
+	
+}
+	
+	
+
+ 
+function zoomScroll(event)
+{
+	if(!dragging || event.buttons < 1)
+	{
+		dragging = false;
+		if(typeof(fullArray) === 'undefined' || fullArray.length === 0)
+		{
+			return;
+		}
+		getClosest(event);
+		
+	}
+	else
+	{
+		var highIsMax = false;
+		var lowIsMin = false;
+		
+		//get the new pos
+		var newXY = [event.clientX, event.clientY];
+		
+		//get the pos delta
+		var delXY = [newXY[0]-clickXY[0],newXY[1]-clickXY[1]];
+		
+		//calculate theoretical new window size
+		var newWin =  Math.pow(zoomScl, delXY[1]) * (winHigh-winLow);
+		
+		//cap the window at between 2 points and the full array
+		newWin = Math.min(Math.max(2,newWin),fullArray.length-1);
+		
+		//get the center off set (pan amount)
+		cenOff = (newXY[0]-canvasLeft)/canvas.clientWidth * (newWin);
+		
+		//cenOff = Math.max(Math.min((newXY[0]-canvasLeft)/canvas.clientWidth * (newWin),newWin),0);
+		
+		var newLow = Math.min(Math.max(0,exactCent-cenOff),fullArray.length-2);
+		//var newLow = Math.min(Math.max(0,exactCent-cenOff),exactCent);
+		if(newLow === 0)
+			lowIsMin = true;
+			
+		var newHigh = Math.min(Math.max(2,exactCent+(newWin-cenOff)),fullArray.length-1);
+		if(newHigh === fullArray.length-1)
+			highIsMax = true;
+			
+		if(highIsMax && !lowIsMin)
+			newLow = Math.max(newHigh-newWin,0);
+		else if(lowIsMin && !highIsMax)
+			newHigh = Math.min(newLow + newWin,fullArray.length-1);
+		
+		//newWin = newHigh-newLow;
+		
+		if(newHigh === winHigh && newLow === winLow)
+		{
+			return;
+		}
+		winLow = newLow;
+		winHigh = newHigh;
+		clickXY = newXY;
+		reDraw(event.clientX);
+	}
+
+}
+
+function reDraw(curX)
+{
+	var totLen = winHigh-winLow;
+	var inc = Math.max(Math.floor(totLen/2000),1);
+	
+	//clear canvas
+	cx.clearRect(0,0,canvas.width, canvas.height);
+	
+	//draw x axis
+	cx.strokeStyle = 'RGB(0,0,0)';
+	cx.lineWidth = .5;
+	cx.beginPath();
+	cx.moveTo(0, halfHt);
+	cx.lineTo(canvas.width, halfHt);
+	cx.stroke();
+	cx.closePath();
+	
+	//draw visible samples
+	cx.beginPath();
+	for(var i = Math.ceil(winLow); i <= Math.floor(winHigh); i += inc)
+	{
+		cx.arc((i-winLow)/totLen * canvas.clientWidth, halfHt + fullArray[i] * -halfHt, sPointRad,0,6.3);
+	}
+	cx.stroke();
+	cx.closePath();
+	
+	//redraw selected region
+	if(lowLock !== -1 && zeros[lowLock] < winHigh && highLock !== -1 && zeros[highLock] > winLow)
+	{
+		cx.beginPath();
+		cx.strokeStyle = 'rgb(150,255,150)';
+		cx.lineWidth = 3;
+		
+		var tStrt= Math.max(Math.floor(winLow),Math.round(zeros[lowLock]));
+		var tEnd = Math.min(Math.ceil(winHigh), Math.round(zeros[highLock]));
+		//console.log(tStrt + ', ' + tEnd);
+		cx.moveTo((tStrt-winLow)/totLen * canvas.clientWidth, halfHt);
+		for(var i = tStrt; i <= tEnd; i +=inc)
+		{
+			cx.lineTo((i-winLow)/totLen * canvas.clientWidth, halfHt + fullArray[i] * -halfHt);
+		}
+		cx.stroke();
+		cx.closePath();
+	}
+	
+	//draw zero points
+	for(var i = 0; i < zeros.length; i += 1)
+	{
+		if(zeros[i] >= winLow && zeros[i] <= winHigh)
+		{
+			if(i === lowLock)
+				cx.fillStyle = 'RGB(0,170,0)';
+			else if(i === highLock)
+				cx.fillStyle = 'RGB(255,100,100)';
+			else if(lowLock !== -1 && i > lowLock && highLock !== -1 && i < highLock)
+				cx.fillStyle = 'RGB(120,220,120)';
+			else
+				cx.fillStyle = 'RGB(100,100,255)';	
+			
+			cx.beginPath();
+			cx.arc((zeros[i]-winLow)/(winHigh-winLow) * canvas.clientWidth, halfHt, pointRad,0, 6.3);
+			cx.fill();
+			cx.closePath();
+		}
+	}
+}
+
+
+
+
+
+
+  
+ function playPause(windowInd, resetIt)
+ {
+	if(started === false) hi();
+	var fadeTime = 100/1000;
+	console.log(windowInd + ', ' + playing);
+	var startPlay = true;
+	if(arguments.length < 1)
+		windowInd = 1;
+		
+	if(playing > 0)
+	{
+		if(windowInd === 0 || (playing === windowInd && (arguments.length < 2 || !resetIt)))
+		{
+			startPlay = false;
+			masterGainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + fadeTime);
+			player.stop(audioContext.currentTime + .01);
+		}
+		else player.stop();
+	}
+	playing = 0;
+	
+	
+	if(startPlay)
+	{
+		console.log(1);
+		playing = windowInd;
+		player = audioContext.createBufferSource();
+		var buffer;
+		var buffArray = [];
+		console.log(2);
+		if(windowInd === 1)
+		{
+			console.log(3);
+			if(typeof(fullArray) === 'undefined'  || fullArray.length === 0)
+			{
+				playing = 0;
+				return;
+			}
+			
+			var strt;
+			var end;
+			
+			if(lowLock !== -1 && highLock !== -1)
+			{
+				strt = Math.round(zeros[lowLock]);
+				end = Math.round(zeros[highLock]);
+			}
+			else
+			{
+				strt = 0;
+				end = fullArray.length-1;
+			}
+			console.log(strt + ' to ' + end + ' total ' + (end-strt));
+			console.log(4);
+			buffer = audioContext.createBuffer(1, end-strt, audioContext.sampleRate);
+			buffArray = buffer.getChannelData(0);
+			console.log(5);
+			for(var i = strt; i < end; i+=1)
+			{
+				buffArray[i-strt] = fullArray[i];
+			}
+			console.log(6);
+			
+		}
+		else
+		{
+			console.log('222')
+			if(typeof(tableArray) === 'undefined')
+			{
+				playing = 0;
+				return;
+			}
+			buffer = audioContext.createBuffer(1, tabLen.value, audioContext.sampleRate);
+			buffArray = buffer.getChannelData(0);
+			for(var i = 0; i < tabLen.value; i+=1)
+			{
+				buffArray[i] = tableArray[i];
+			}
+		}
+		//console.log(tableArray);
+		player.buffer = buffer;
+		console.log(buffer);
+		player.loop = true;
+		player.connect(gainNode);
+		masterGainNode.gain.setTargetAtTime(.7, 0, .3);
+		//masterGainNode.gain.exponentialRampToValueAtTime(1.0, audioContext.currentTime + fadeTime);
+		player.start();
+		setPlaySpeed(windowInd);
+		setGain(windowInd);
+		console.log(8);
+	}
+		
+		
+ }			
+		
+ function getCoeffs(ys)
+ {
+	if(ys.length !== 4)
+	{
+		console.log('wrong size matrix');
+		return;
+	}
+	var s = [];
+	s.length = 3;
+	s[0] = ys[0]-ys[1];
+	s[1] = ys[2]-ys[1];
+	s[2] = ys[3]-ys[1];
+	
+	var coeffs = [];
+	coeffs.length = 4;
+	coeffs[3] = ys[1];
+	coeffs[1] = (s[1] + s[0])/2;
+	coeffs[2] = -2 * ((s[2]/8 + s[0]) * 2/3 - coeffs[1]);
+	coeffs[0] = -s[0] - coeffs[2] + coeffs[1];
+	return coeffs;
+}
+
+
+function reSample()
+{
+	if(typeof(fullArray) === 'undefined'  || fullArray.length === 0|| lowLock === -1 || highLock === -1)
+		return;
+		
+	const maxHex = Math.abs((1 << (Number(tabSign.value)-1))) -1;
+	console.log((1 << 31));
+	console.log(maxHex);
+	
+	var ord = Number(smoothOrd.value);
+	var samps = Number(tabLen.value);
+	var fudge = Number(smoothAmt.value);
+	var currentInd = refineZero(zeros[lowLock]);
+	var inc = (refineZero(zeros[highLock])-currentInd)/samps;
+	var leftOfInd = -1;
+	var coeffs = [];
+
+	var maxVal = 0;
+	var maxNeg = 0;
+	var maxPos = 0;
+	var tArray = [];
+	var outArray;
+			
+	//resample the selected window (up until the fudge point)
+	for(var i = 0; i < (samps - fudge); i += 1)
+	{
+		if(Math.floor(currentInd) !== leftOfInd)
+		{
+			var pts = [];
+			var leftOfInd = Math.floor(currentInd);
+			var strt = Math.max(0, leftOfInd - (Number(smoothOrd.value) -1));
+			var end = Math.min(fullArray.length -1, strt + 2 * Number(smoothOrd.value));
+			for(var j = strt; j < end; j += 1)
+			{
+				pts.push([j-strt,fullArray[j]]);
+			}
+			coeffs = matrixSolver(pts);
+			leftOfInd = Math.floor(currentInd);
+		}
+		tArray.push(getY(currentInd-strt,coeffs));			
+		currentInd += inc;
+	}
+	
+	//fudge the selected number of points at the end
+	if(fudge > 0)
+	{
+		var pts = [];
+		var offSet = Math.floor(fudge/2);
+		for(var i= 0; i < ord; i += 1)
+		{
+			pts.push([i + offSet,tArray[i]]);
+			pts.push([-fudge-1-i +offSet,tArray[samps-fudge-1-i]]);
+		}
+		coeffs=matrixSolver(pts);
+		for(var i = 0; i < fudge; i += 1)
+		{
+			tArray.push(getY(-fudge + i + offSet,coeffs));
+		}
+	}
+	
+	//loop through and find the max/min values
+	for(var i=0; i < samps; i +=1)
+	{
+		if(Math.abs(tArray[i]) > maxVal)
+			maxVal = Math.abs(tArray[i]);
+		if(tArray[i] > maxPos)
+			maxPos = tArray[i];
+		if(tArray[i] < maxNeg) 
+			maxNeg = tArray[i];
+	}
+	
+	//normalize and re-zero
+	var needsWork = document.getElementById('norm').checked === true;
+	var itr = 0;
+	var maxItr = 30;
+	while(needsWork && itr < maxItr)
+	{
+		itr += 1;
+		var newZero = (maxPos + maxNeg)/2;
+		if(newZero === 0)
+			break;
+		
+		//shift all samples
+		for(var i = 0; i < samps; i +=1)
+		{
+			tArray[i] = (tArray[i]-newZero);
+		}
+		
+		//find the new nearest zero crossing (looking in both directions)
+		for(var p = 0; p < samps; p += 1)
+		{
+			if(Math.sign(tArray[p]) !== Math.sign(tArray[p + 1]))
+			{
+				leftOfInd = p;
+				break;
+			}
+			else if(Math.sign(tArray[(samps - p) % samps]) !== Math.sign(tArray[samps-p-1]))
+			{
+				leftOfInd = samps-p-1;
+				break;
+			}
+		}
+		
+		//use the points surrounding the crossing to find the exact zero point
+		var pts = [];
+		for(var k = 0; k < ord; k += 1)
+		{
+			pts.push([-k,tArray[(leftOfInd-k + samps) % samps]]);
+			pts.push([1+k,tArray[(leftOfInd+1+k) % samps]]);
+		}
+		currentInd = leftOfInd + rootSeek(0,1, 30, matrixSolver(pts));
+
+		//resample the array using the new starting point
+		maxVal = 0;
+		maxPos = 0;
+		maxNeg = 0;
+		var tArray2 = [];
+		for(var k = 0; k < samps; k +=1)
+		{
+			var newInd = (currentInd + k) % samps;
+			var pts = [];
+			leftOfInd = Math.floor(newInd);
+			
+			for(var m = 0; m < ord; m +=1)
+			{
+				pts.push([-m,tArray[(leftOfInd - m + samps) % samps]]);
+				pts.push([m+1,tArray[(leftOfInd + 1 + m) % samps]]);
+			}
+			tArray2.push(getY(newInd - leftOfInd,matrixSolver(pts)));
+			
+			if(Math.abs(tArray2[k]) > maxVal)
+				maxVal = Math.abs(tArray2[k]);
+			if(tArray2[k] > maxPos)
+				maxPos = tArray2[k];
+			if(tArray2[k] < maxNeg) 
+				maxNeg = tArray2[k];
+			
+		}
+		tArray = tArray2;
+		if(Math.round(maxPos/maxVal * maxHex) === maxHex && Math.round(-maxNeg/maxVal * maxHex) === maxHex)
+		{
+			needsWork = false;
+			break;
+		}
+		else
+			console.log('not quite-- pos: ' + Math.round(maxPos/maxVal * maxHex) + ', neg: ' + Math.round(maxNeg/maxVal * maxHex) + ' of ' + maxHex);
+			
+	
+	}
+	if(needsWork)
+		console.log('didnt get it-- pos: ' + Math.round(maxPos/maxVal * maxHex) + ', neg: ' + Math.round(maxNeg/maxVal * maxHex) + ' of ' + maxHex);
+	else	
+		console.log(itr + ', loops');
+		
+	//declare output array dependent on resolution and sample count
+	switch(Number(tabRes.value))
+	{
+		case 8:
+			outArray = new Int8Array(samps);
+			break;
+		case 16:
+			outArray = new Int16Array(samps);
+			break;
+		case 32:
+			outArray = new Int32Array(samps);
+	}
+
+	const halfHt2 = canvas2.height/2;
+	const cxInc = canvas2.width/samps;
+	var cxPos = 0;
+	
+	cx2.clearRect(0,0,canvas2.width,canvas2.height);
+	//cx2.closePath();
+	cx2.beginPath();
+	cx2.lineWidth = 1;
+	cx2.strokeStyle = 'RGB(0,0,0)';
+	cx2.moveTo(0,halfHt2);
+	cx2.lineTo(canvas2.width,halfHt2);
+	cx2.stroke();
+	//cx2.closePath();
+	cx2.beginPath();
+	cx2.moveTo(0,halfHt2);
+	tableArray = [];
+	for(var i = 0; i < samps; i += 1)
+	{
+		tableArray.push(tArray[i]/maxVal);
+		outArray[i] = Math.round(tArray[i]/maxVal * maxHex);
+		cx2.lineTo(cxPos, halfHt2 * (1- outArray[i]/maxHex));
+		cxPos += cxInc;
+	}
+	cx2.lineTo(canvas2.width,halfHt2);
+	cx2.stroke();
+	//cx2.closePath();
+	saveWave(outArray, 'test');
+	
+}
+
+/*function matrixSolverFromNear(goalInd,ord)
+{
+	var leftOfInd = Math.floor(goalInd);
+	var strt = Math.max(0, leftOfInd - (Number(smoothOrd.value) -1));
+	var end = Math.min(fullArray.length -1, strt + 2 * Number(smoothOrd.value));
+	for(var i = strt; i < end; i += 1)
+	{
+		pts.push([i-strt,fullArray[i]]);
+	}
+	return matrixSolver(pts);
+}*/
+
+function refineZero(inZero)
+{
+	var pts = [];
+	var leftOfZero = Math.floor(inZero);
+	var strt = Math.max(0, leftOfZero - (Number(smoothOrd.value) -1));
+	var end = Math.min(fullArray.length -1, strt + 2 * Number(smoothOrd.value));
+	for(var i = strt; i < end; i += 1)
+	{
+		pts.push([i-strt,fullArray[i]]);
+	}
+	return strt + rootSeek(leftOfZero-strt,leftOfZero-strt+1, 30, matrixSolver(pts));
+ }
+
+				
+function saveWave(inArr, fName)
+{
+	var byteGroup = Number(tabRes.value)/8;
+	var bytes = new Uint8Array(inArr.length * byteGroup);
+	for (var i=0; i<inArr.length;i+=1) 
+	{
+		for(var j=0; j<byteGroup; j+=1)
+		{	
+			bytes[byteGroup*i+j]= (inArr[i] >> (8 * j)) & 255;
+		}
+	}
+	var blob = new Blob([bytes], {type: "application/octet-stream"});
+	document.getElementById('dummy').href = URL.createObjectURL(blob);
+	
+}
+
+function download(name)
+{
+	if(arguments.length < 1 || name === undefined)
+		var fName = document.getElementById('fName').value;
+	else
+		var fName = name;
+		
+	var link = document.getElementById('dummy').href;
+	if(fName === "")
+	{
+		console.log('no filename');
+		return;
+	}	
+	if(link === "")
+	{
+		console.log('no data');
+		return;
+	}
+	document.getElementById('dummy').download =fName;
+	document.getElementById('dummy').click();
+}
+
+
+
+function downloadSynths(downloadIt)
+{
+	var samps = Number(tabLen.value);
+	const maxHex = Math.abs((1 << (Number(tabSign.value)-1))) -1;
+	var wave;
+	var fName;
+	var dutyPct = duty.value/100;
+	
+	switch(Number(tabRes.value))
+	{
+		case 8:
+			wave = new Int8Array(samps);
+			break;
+		case 16:
+			wave = new Int16Array(samps);
+			break;
+		case 32:
+			wave = new Int32Array(samps);
+	}
+	
+	//sine
+	if(document.getElementById("sine").checked === true)
+	{
+		fName = "SIN"
+		for(var samp = 0; samp < samps; samp++)
+		{
+			var phase = samp/samps * 2 * Math.PI;
+			wave[samp] = Math.sin(phase) * maxHex;
+		}
+	}
+	
+	
+	//square full
+	else if(document.getElementById("squF").checked === true)
+	{
+		fName = "SQUF"
+		for(var samp = 0; samp < samps; samp++)
+		{
+			var scl;
+			if(samp < samps * dutyPct)
+				scl = 1;
+			else
+				scl = -1;
+			wave[samp] = scl * maxHex;
+		}
+	}
+	
+	//square rms
+	else if(document.getElementById("squR").checked === true)
+	{
+		fName = "SQUR"
+		for(var samp = 0; samp < samps; samp++)
+		{
+			var scl;
+			if(samp < samps * dutyPct)
+				scl = .707;
+			else
+				scl = -.707
+				;
+			wave[samp] = scl * maxHex;
+		}
+	}
+	
+	//tri
+	else if(document.getElementById("tri").checked === true)
+	{
+		dutyPct /= 2;
+		dutyPct = Math.floor(samps * dutyPct)/samps;
+		var incA = maxHex / (samps * dutyPct);
+		var incB = maxHex / (samps * (.5-dutyPct));
+		var inc = incA;
+		console.log(inc);
+		var lev = 0;
+		var stage = 0;
+		fName = "TRI"
+		for(var samp = 0; samp < samps; samp++)
+		{
+			wave[samp] = lev;
+			if(samp >= samps * dutyPct && stage === 0)
+			{
+				inc = -incB;
+				stage = 1;
+			}
+			else if(samp >= samps * (1-dutyPct) && stage === 1)
+			{
+				inc = incA;
+				stage = 2;
+			}
+			lev += inc;
+		}
+				
+	}
+	
+	//saw down
+	else if(document.getElementById("sawD").checked === true)
+	{
+		var inc = -maxHex / (samps/2);
+		var lev = 0;
+		var stage = 0;
+		fName = "SAWD"
+		for(var samp = 0; samp < samps; samp++)
+		{
+			wave[samp] = lev;
+			if(samp >= samps/2 && stage === 0)
+			{
+				lev = -lev;
+				stage = 1;
+			}
+			lev += inc;
+		}
+	
+	}
+	
+	//saw up
+	else if(document.getElementById("sawU").checked === true)
+	{
+		var inc = maxHex / (samps/2);
+		var lev = 0;
+		var stage = 0;
+		fName = "SAWU"
+		for(var samp = 0; samp < samps; samp++)
+		{
+			wave[samp] = lev;
+			if(samp >= samps/2 && stage === 0)
+			{
+				lev = -lev;
+				stage = 1;
+			}
+			lev += inc;
+		}
+	}
+	
+	//noise
+	else if(document.getElementById("noise").checked === true)
+	{
+		var inc = maxHex / (samps/2);
+		var lev = 0;
+		var stage = 0;
+		fName = "noise"
+		for(var samp = 0; samp < samps; samp++)
+		{
+			wave[samp] = (2* Math.random() -1) * maxHex;
+		}
+	}
+	
+	tableArray = [];
+	for(var samp = 0; samp < samps; samp++)
+	{
+		tableArray.push(wave[samp]/maxHex);
+	}		
+	
+	drawSynth(wave, maxHex);
+	
+	if(downloadIt)
+	{
+		saveWave(wave);
+		download(fName);
+	}
+	
+	if(playing === 2) playPause(2, 1);
+		
+}
+
+
+function drawSynth(synArr, maxHex)
+{
+	var samps = synArr.length;
+	const halfHt2 = canvas2.height/2;
+	const cxInc = canvas2.width/samps;
+	var cxPos = 0;
+	
+	
+	cx2.clearRect(0,0,canvas2.width,canvas2.height);
+	//cx2.closePath();
+	cx2.beginPath();
+	cx2.lineWidth = 1;
+	cx2.strokeStyle = 'RGB(0,0,0)';
+	cx2.moveTo(0,halfHt2);
+	cx2.lineTo(canvas2.width,halfHt2);
+	cx2.stroke();
+	//cx2.closePath();
+	cx2.beginPath();
+	cx2.moveTo(0,halfHt2);
+	for(var i = 0; i < samps; i += 1)
+	{
+		cx2.lineTo(cxPos, halfHt2 * (1- synArr[i]/maxHex));
+		cxPos += cxInc;
+	}
+	cx2.lineTo(canvas2.width,halfHt2);
+	cx2.stroke();
+	
+}
+
+</script>
+  
+
+</html> 
