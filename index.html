@@ -80,7 +80,7 @@ a:hover {
 </div>
 
 <div id="speed2Div" class="unselectable" style="position:absolute;">
-  <input id="speed2"  type="range" min="1" max="73" value="36"	oninput= 'setPlaySpeed(2);'></input> freq
+  <input id="speed2"  type="range" min=".001" max="73" value="36"	oninput= 'setPlaySpeed(2);'></input> freq
 </div>
 
 <div id="vol2Div" class="unselectable" style="position:absolute;">
@@ -314,6 +314,7 @@ function setPlaySpeed(windowInd)
 	else if(windowInd === 2)
 		playSpeed = Math.exp(linInterp(speed2.min, speed2.value, speed2.max,logLow2, logHigh2));
 	
+	console.log('playspeed ' + playSpeed);
 	if(playing > 0)
 		player.playbackRate.setTargetAtTime(playSpeed, 0, 0);
 		
@@ -462,7 +463,7 @@ function tableChange()
 		
 		smoothAmt.value = 0;
 		oldTabLen = tabLen.value;
-		logLow2 = Math.log(.125 * tabLen.value/256);
+		logLow2 = Math.log(.005 * tabLen.value/256);
 		logHigh2 = Math.log(8 * tabLen.value/256);
 	}
 	
@@ -517,8 +518,8 @@ function enterDrag(event)
 			}
 		}
 	}
-	clickXY[0] = event.clientX;
-	clickXY[1] = event.clientY;
+	clickXY[0] = event.pageX;
+	clickXY[1] = event.pageY;
 	dragging = true;
 
 }
@@ -537,7 +538,7 @@ function leaveDrag(event)
 function getClosest(event)
 {
 	
-	exactCent = (event.clientX-canvasLeft)/canvas.clientWidth * (winHigh-winLow) + winLow;
+	exactCent = (event.pageX-canvasLeft)/canvas.clientWidth * (winHigh-winLow) + winLow;
 	var upr = zeros.length-1;
 	var lwr = 0;
 	var mid;
@@ -574,7 +575,7 @@ function getClosest(event)
 		nearestZero = mid;
 		tCent = zeros[nearestZero];
 		
-		if(Math.abs(event.clientY - canvasTop - halfHt) < (tPointRad * 1.5))
+		if(Math.abs(event.pageY - canvasTop - halfHt) < (tPointRad * 1.5))
 			atZeroY = true;
 		
 		if(event.ctrlKey || nearestZero === lowLock)
@@ -592,7 +593,7 @@ function getClosest(event)
 	}
 	
 	cxT.clearRect(0,0,canvas.width, canvas.height);
-	if(event.clientY - canvasTop >= 0 && event.clientY - canvasTop <= canvas.height)
+	if(event.pageY - canvasTop >= 0 && event.pageY - canvasTop <= canvas.height)
 	{
 		cxT.beginPath();
 		cxT.strokeStyle = 'RGB(200,200,255)';
@@ -645,7 +646,7 @@ function zoomScroll(event)
 		var lowIsMin = false;
 		
 		//get the new pos
-		var newXY = [event.clientX, event.clientY];
+		var newXY = [event.pageX, event.pageY];
 		
 		//get the pos delta
 		var delXY = [newXY[0]-clickXY[0],newXY[1]-clickXY[1]];
@@ -684,7 +685,7 @@ function zoomScroll(event)
 		winLow = newLow;
 		winHigh = newHigh;
 		clickXY = newXY;
-		reDraw(event.clientX);
+		reDraw(event.pageX);
 	}
 
 }
@@ -1148,6 +1149,7 @@ function downloadSynths(downloadIt)
 	var samps = Number(tabLen.value);
 	const maxHex = Math.abs((1 << (Number(tabSign.value)-1))) -1;
 	var wave;
+	var wave2;
 	var fName;
 	var dutyPct = duty.value/100;
 	
@@ -1155,12 +1157,15 @@ function downloadSynths(downloadIt)
 	{
 		case 8:
 			wave = new Int8Array(samps);
+			wave2 = new Int8Array(samps);
 			break;
 		case 16:
 			wave = new Int16Array(samps);
+			wave2 = new Int16Array(samps);
 			break;
 		case 32:
 			wave = new Int32Array(samps);
+			wave2 = new Int32Array(samps);
 	}
 	
 	//sine
@@ -1169,7 +1174,7 @@ function downloadSynths(downloadIt)
 		fName = "SIN"
 		for(var samp = 0; samp < samps; samp++)
 		{
-			var phase = samp/samps * 2 * Math.PI;
+			var phase = 2* Math.PI * (samp/samps);
 			wave[samp] = Math.sin(phase) * maxHex;
 		}
 	}
@@ -1182,7 +1187,7 @@ function downloadSynths(downloadIt)
 		for(var samp = 0; samp < samps; samp++)
 		{
 			var scl;
-			if(samp < samps * dutyPct)
+			if(samp < samps * .5)
 				scl = 1;
 			else
 				scl = -1;
@@ -1197,11 +1202,10 @@ function downloadSynths(downloadIt)
 		for(var samp = 0; samp < samps; samp++)
 		{
 			var scl;
-			if(samp < samps * dutyPct)
+			if(samp < samps * .5)
 				scl = .707;
 			else
-				scl = -.707
-				;
+				scl = -.707;
 			wave[samp] = scl * maxHex;
 		}
 	}
@@ -1209,11 +1213,8 @@ function downloadSynths(downloadIt)
 	//tri
 	else if(document.getElementById("tri").checked === true)
 	{
-		dutyPct /= 2;
-		dutyPct = Math.floor(samps * dutyPct)/samps;
-		var incA = maxHex / (samps * dutyPct);
-		var incB = maxHex / (samps * (.5-dutyPct));
-		var inc = incA;
+
+		var inc = maxHex/(samps * .25);
 		console.log(inc);
 		var lev = 0;
 		var stage = 0;
@@ -1221,14 +1222,14 @@ function downloadSynths(downloadIt)
 		for(var samp = 0; samp < samps; samp++)
 		{
 			wave[samp] = lev;
-			if(samp >= samps * dutyPct && stage === 0)
+			if(samp >= samps * .25 && stage === 0)
 			{
-				inc = -incB;
+				inc = -inc;
 				stage = 1;
 			}
-			else if(samp >= samps * (1-dutyPct) && stage === 1)
+			else if(samp >= samps * .75 && stage === 1)
 			{
-				inc = incA;
+				inc = -inc;
 				stage = 2;
 			}
 			lev += inc;
@@ -1288,13 +1289,68 @@ function downloadSynths(downloadIt)
 		}
 	}
 	
+	//duty
+	var dutyCut = Math.floor(samps * dutyPct);
+	for(var samp = 0; samp < samps; samp+= 1)
+	{
+		var ind;
+		if(samp < dutyCut)
+		{
+			ind = samp* .5/dutyPct;
+			
+		}
+		else
+		{
+			ind = samps/2 + (samp-dutyCut)  * .5/(1-dutyPct);
+		}
+		var lowX = Math.floor(ind);
+			if(lowX < 0 || lowX > samps-2) console.log(lowX + ' is bad');
+			wave2[samp] = linInterp(lowX, ind, lowX + 1, wave[lowX], wave[lowX + 1]);
+		
+	}
+	
+	var offSet = 60;
+	var pull = .98;
+	//filter
+	for(var samp = 0; samp < samps; samp+= 1)
+	{
+		var sum = 0;
+		for(ind = samp-offSet; ind <= samp + offSet; ind += 1)
+		{
+			if(ind !== samp)
+			{
+				var act = ind;
+				if(act < 0) act += samps;
+				else if(act >= samps) act -= samps;
+				sum += wave2[act];
+			}
+		}
+		wave2[samp] = wave2[samp] * (1-pull) + (sum/(2*offSet)) * pull;
+	}
+	
+	for(var samp = samps-1; samp >-1 ; samp-= 1)
+	{
+		var sum = 0;
+		for(ind = samp-offSet; ind <= samp + offSet; ind += 1)
+		{
+			if(ind !== samp)
+			{
+				var act = ind;
+				if(act < 0) act += samps;
+				else if(act >= samps) act -= samps;
+				sum += wave2[act];
+			}
+		}
+		wave2[samp] = wave2[samp] * (1-pull) + (sum/(2*offSet)) * pull;
+	}
+	
 	tableArray = [];
 	for(var samp = 0; samp < samps; samp++)
 	{
-		tableArray.push(wave[samp]/maxHex);
+		tableArray.push(wave2[samp]/maxHex);
 	}		
 	
-	drawSynth(wave, maxHex);
+	drawSynth(wave2, maxHex);
 	
 	if(downloadIt)
 	{
