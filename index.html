@@ -80,7 +80,7 @@ a:hover {
 </div>
 
 <div id="speed2Div" class="unselectable" style="position:absolute;">
-  <input id="speed2"  type="range" min=".001" max="73" value="36"	oninput= 'setPlaySpeed(2);'></input> freq
+  <input id="speed2"  type="range" min="1" max="73" value="36"	oninput= 'setPlaySpeed(2);'></input> freq
 </div>
 
 <div id="vol2Div" class="unselectable" style="position:absolute;">
@@ -189,7 +189,7 @@ vol1.style.height = canvas.height + 'px';
 document.getElementById("play1Div").style.left = document.getElementById("vol1Div").offsetLeft + vol1.clientWidth + 15 + 'px';
 document.getElementById("play1Div").style.top = canvasTop + canvas.clientHeight * .3 + 'px';
 var play1 = document.getElementById("play1");
-play1.style.padding= "30px 10px 30px 10px";
+play1.style.padding= "5px 5px 5px 5px";
 
 document.getElementById("speed1Div").style.left = canvasLeft + 'px';
 document.getElementById("speed1Div").style.top = canvasTop + canvas.clientHeight + 10 + 'px';
@@ -261,7 +261,7 @@ vol2.style.height = canvas2.height + 'px';
 document.getElementById("play2Div").style.left = document.getElementById("vol2Div").offsetLeft + vol2.clientWidth +15 + 'px';
 document.getElementById("play2Div").style.top = document.getElementById("canvas2Div").offsetTop + canvas2.clientHeight * .2 + 'px';
 var play2 = document.getElementById("play2");
-play2.style.padding= "30px 10px 30px 10px";
+play2.style.padding= "5px 5px 5px 5px";
 
 document.getElementById("speed2Div").style.left = canvasLeft + 'px';
 document.getElementById("speed2Div").style.top = document.getElementById("canvas2Div").offsetTop + canvas2.clientHeight + 10 + 'px';
@@ -463,7 +463,7 @@ function tableChange()
 		
 		smoothAmt.value = 0;
 		oldTabLen = tabLen.value;
-		logLow2 = Math.log(.005 * tabLen.value/256);
+		logLow2 = Math.log(.125 * tabLen.value/256);
 		logHigh2 = Math.log(8 * tabLen.value/256);
 	}
 	
@@ -1309,7 +1309,7 @@ function downloadSynths(downloadIt)
 		
 	}
 	
-	var offSet = 60;
+	/* var offSet = 60;
 	var pull = .98;
 	//filter
 	for(var samp = 0; samp < samps; samp+= 1)
@@ -1342,7 +1342,7 @@ function downloadSynths(downloadIt)
 			}
 		}
 		wave2[samp] = wave2[samp] * (1-pull) + (sum/(2*offSet)) * pull;
-	}
+	} */
 	
 	tableArray = [];
 	for(var samp = 0; samp < samps; samp++)
